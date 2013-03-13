@@ -1,4 +1,6 @@
-# Script for converting SQL Server dumps into PostgreSQL loads
+# Convert SQL Server dump scripts into PostgreSQL
+
+This script was developed for the RAVF project.
 
 ## Building
 
