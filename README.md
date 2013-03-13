@@ -10,6 +10,8 @@ You can build the executable using cabal:
 
 That will create an executable called `dist/build/sqlconvert/sqlconvert`. It can be copied to another ubuntu machine, for example to `/usr/local/bin/sqlconvert`
 
+Note: I have checked in the executable in the base directory too, if you don't have the Haskell platform near by.
+
 ## Using it
 
 The script expects an ASCI formated SQL Server dump file. UTF-8 coming next. It reads standard in and writes standard out. So, for example:
