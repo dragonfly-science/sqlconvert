@@ -16,3 +16,4 @@ Executable sqlconvert
                      time,
                      old-locale,
                      bytestring
+  ghc-options: -O2 -Wall

@@ -1,13 +1,8 @@
 {-# LANGUAGE OverloadedStrings #-}
 {-# LANGUAGE TupleSections #-}
-{- SQL Server ouput converted into PostgreSQL
- -
- - Uses Parsec to do the parsing.
- - Reads standard input, writes to standard output
- -
- -}
-
+--
 module Main where
+-- SQL Server ouput converted into PostgreSQL
 
 import           Control.Applicative hiding (many)
 import           Control.Monad (mzero)
