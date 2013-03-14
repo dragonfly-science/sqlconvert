@@ -69,7 +69,7 @@ insertStatement insertState =
         value  =  (string "NULL" >> return "\\N")  
               <|> parseDateTime
               <|> parseString
-              <|> (AL.takeWhile $ AL.inClass "0-9.")
+              <|> (AL.takeWhile $ AL.inClass "0-9.xA-F")
 
 
 parseDateTime :: Parser BS.ByteString
@@ -148,7 +148,7 @@ column :: Parser Column
 column =  Column <$> (skipSpace *> identifier  <* char ' ') <*> (ctype <* char ' ' ) <*> (many' cqualifier)
 showColumn :: Column -> ByteString
 -- Handle some fields specially
-showColumn (Column "TimeStamp" _ _) = intercalate " " $ ["    ", "\"TimeStamp\"", "BIGINT", "NULL"]
+showColumn (Column "TimeStamp" _ _) = intercalate " " $ ["    ", "\"TimeStamp\"", "TEXT", "NULL"]
 showColumn (Column "Photo" _ _)     = intercalate " " $ ["    ", "\"Photo\"",     "TEXT",   "NULL"]
 showColumn (Column cn ct cqs) =
     let  col = showIdentifier cn
