@@ -100,8 +100,8 @@ parseDateTime =
         [(timen, _)] = readHex hex2
         day = addDays days (fromGregorian 1900 1 1)
         timeDiff = picosecondsToDiffTime (floor (timen * 10000000000/3))
-    if days > (300*365)
-        then return "\\N"
+    if days > 106680740  -- largest date 294276 AD
+        then return "294275-01-01 00:00:00"
         else return $ BSC.pack $ formatTime defaultTimeLocale "%F %T" $ UTCTime day timeDiff 
     where
         eighthex = A.count 8 (AC.satisfy (AC.inClass "0-9A-F"))
@@ -179,7 +179,7 @@ column =  Column <$> (skipSpace *> identifier  <* char ' ') <*> (ctype <* char '
 showColumn :: Column -> ByteString
 -- Handle some fields specially
 showColumn (Column "TimeStamp" _ _) = intercalate " " $ ["    ", "\"TimeStamp\"", "TEXT", "NULL"]
-showColumn (Column "Photo" _ _)     = intercalate " " $ ["    ", "\"Photo\"",     "TEXT",   "NULL"]
+showColumn (Column "Photo" _ _)     = intercalate " " $ ["    ", "\"Photo\"",     "TEXT", "NULL"]
 showColumn (Column cn ct cqs) =
     let  col = showIdentifier cn
          cty = fixType ct
