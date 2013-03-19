@@ -109,9 +109,11 @@ parseDateTime =
 parseString :: Parser BS.ByteString
 parseString = (string "N''" >> return "") <|>
   do
-    res <- string "N'" *> takeWhile1 (/= '\'') <* char '\''
+    res <- string "N'" *> contents <* char '\''
     return $ BSC.concatMap escape res
-    where   -- http://www.postgresql.org/docs/9.1/static/sql-copy.html
+    where   
+        contents = BSC.concat <$> many1 (takeWhile1 (/= '\'') <|> (string "''" >> return "'"))
+        -- http://www.postgresql.org/docs/9.1/static/sql-copy.html
         escape '\n' = BSC.pack "\\n"
         escape '\t' = BSC.pack "\\t"
         escape '\r' = BSC.pack "\\r"
