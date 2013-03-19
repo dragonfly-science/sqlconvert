@@ -7,27 +7,35 @@ module Main where
 import           Control.Applicative hiding (many)
 import           Control.Monad (mzero)
 import           Numeric (readHex)
-import           Data.Maybe (catMaybes)
 import           Data.Time
 import           System.Locale
 
 import           Data.Attoparsec.ByteString as A hiding (takeWhile1)
-import           Data.Attoparsec.ByteString.Char8 as AC (endOfLine, isEndOfLine, skipSpace, char, isDigit, takeWhile1, satisfy, inClass)
+import           Data.Attoparsec.ByteString.Char8 as AC 
+        (endOfLine, isEndOfLine, skipSpace, char, takeWhile1, satisfy, inClass)
 import qualified Data.Attoparsec.ByteString.Lazy as AL
 
 import qualified Data.ByteString as BS
 import qualified Data.ByteString.Char8 as BSC
 import           Data.ByteString.Lazy hiding (map)
 
-import           Prelude hiding (takeWhile, concat, interact)
+import           Prelude hiding (takeWhile, concat, interact, getContents, putStr)
+import           System.IO (stderr)
 
 -- Entry captures something interesting, or Nothing
-type Entry = Maybe ByteString
+type Entry = Either (Maybe ByteString) ByteString
 -- the names of 'current' insert fields
 type InsertState = Maybe [ BS.ByteString ] 
 
 main :: IO ()
-main = interact ( concat . catMaybes . parseSQL Nothing)
+main = 
+  do
+    contents <- getContents
+    let parsed = parseSQL Nothing contents
+    mapM_ (either writeErrors putStr) parsed
+    where
+        writeErrors (Just err) = hPutStr stderr err
+        writeErrors Nothing    = return ()
 
 -- Lazy parser, converts a lazy bytestring into a lazy string of Entries 
 parseSQL :: InsertState -> ByteString -> [Entry]
@@ -42,6 +50,7 @@ parseEntry insertState  =  (insertState,) <$> createTable
                        <|> (insertState,) <$> alterTable
                        <|> insertStatement insertState 
                        <|> finishInserts insertState 
+                       <|> (insertState,) <$> ignoreInsert
                        <|> (insertState,) <$> ignoreLine
 
 
@@ -60,19 +69,29 @@ insertStatement insertState =
     let copyLine = concat ["COPY ", showIdentifier tableName, " (", cols, ") FROM STDIN;\n" ]
         cols = intercalate "," (map showIdentifier columns)
     case insertState of
-        Nothing -> return (Just columns, Just (concat [copyLine, writeVals values]))
-        Just _  -> return (Just columns, Just (writeVals values))
+        Nothing -> return (Just columns, Right (concat [copyLine, writeVals values]))
+        Just _  -> return (Just columns, Right (writeVals values))
 
     where
         writeVals :: [BS.ByteString] -> ByteString
         writeVals vals = concat [intercalate "\t" $ map fromStrict vals, "\n"]
-        value  =  (string "NULL" >> return "\\N")  
-              <|> parseDateTime
+        numbers = AL.takeWhile $ AL.inClass "0-9.xA-F"
+        value  =  (string "NULL" >> return "\\N")
               <|> parseString
-              <|> (AL.takeWhile $ AL.inClass "0-9.xA-F")
+              <|> parseCast
+              <|> parseDateTime
+              <|> numbers
 
 
-parseDateTime :: Parser BS.ByteString
+ignoreInsert :: Parser Entry
+ignoreInsert = 
+  do 
+    start <- string "INSERT [dbo]."
+    rest <- AL.takeWhile (not . isEndOfLine)
+    endOfLine
+    return $ Left (Just ( concat [fromStrict start, fromStrict rest, "\n"]))
+
+parseDateTime :: Parser BS.ByteString 
 parseDateTime =
   do 
     (hex1, hex2) <- string "CAST(0x" *> ((,) <$> eighthex <*> eighthex) <* " AS DateTime)"   
@@ -101,9 +120,16 @@ parseString = (string "N''" >> return "") <|>
         escape '\\' = BSC.pack "\\\\"
         escape c    = BSC.pack [c]
 
+parseCast :: Parser BS.ByteString
+parseCast =
+  do 
+    string "CAST(" *> number <* " AS Decimal(" <* number <* ", " <* number <* "))"   
+    where
+        number = AL.takeWhile $ AL.inClass "0-9.xA-F"
+
 finishInserts :: InsertState -> Parser (InsertState, Entry)
 finishInserts Nothing = mzero
-finishInserts (Just _) = (string "/****" <|> string "SET") >> ignoreLine >> return (Nothing, Just "\\.\n")
+finishInserts (Just _) = (string "/****" <|> string "SET") >> ignoreLine >> return (Nothing, Right "\\.\n")
 
 -----------------------------------
 -- CREATE TABLE 
@@ -114,7 +140,7 @@ createTable =
     columns <- many1 (column <* ignoreLine)
     let cs = intercalate ",\n" $ map showColumn columns
     let result = concat $ ["CREATE TABLE ", showIdentifier tableName, " (", "\n",  cs, "\n);\n"]
-    return (Just result)
+    return (Right result)
 
 -- ALTER TABLE 
 alterTable :: Parser Entry
@@ -124,7 +150,7 @@ alterTable =
     c <- column
     endOfLine
     let result = concat $ ["ALTER TABLE ", showIdentifier tableName, " ADD COLUMN ", showColumn c, ";\n"]
-    return (Just result)
+    return (Right result)
 
 
 identifier :: Parser BS.ByteString
@@ -141,7 +167,9 @@ cqualifier  =  string "NOT NULL"
 -- Columns
 data ColumnType = ColumnType BS.ByteString (Maybe BS.ByteString) deriving Eq
 ctype :: Parser ColumnType
-ctype = ColumnType <$> identifier <*> option Nothing ( Just <$> (char '(' *> takeWhile1 isDigit <* char ')'))
+ctype = ColumnType <$> identifier <*> option Nothing nums
+    where 
+        nums = Just <$> (char '(' *> takeWhile1 (/= ')') <* char ')')
 
 data Column = Column { columnName :: BS.ByteString, columnType :: ColumnType, columnQualifiers :: [BS.ByteString] } deriving Eq
 column :: Parser Column
@@ -179,6 +207,6 @@ showColumn (Column cn ct cqs) =
 ignoreLine :: Parser Entry
 ignoreLine = do skipWhile (not . isEndOfLine)
                 endOfLine
-                return Nothing
+                return $ Left Nothing
 
 
