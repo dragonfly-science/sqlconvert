@@ -107,12 +107,12 @@ parseDateTime =
         eighthex = A.count 8 (AC.satisfy (AC.inClass "0-9A-F"))
             
 parseString :: Parser BS.ByteString
-parseString = (string "N''" >> return "") <|>
+parseString = 
   do
     res <- string "N'" *> contents <* char '\''
     return $ BSC.concatMap escape res
     where   
-        contents = BSC.concat <$> many1 (takeWhile1 (/= '\'') <|> (string "''" >> return "'"))
+        contents = BSC.concat <$> many' (takeWhile1 (/= '\'') <|> (string "''" >> return "'"))
         -- http://www.postgresql.org/docs/9.1/static/sql-copy.html
         escape '\n' = BSC.pack "\\n"
         escape '\t' = BSC.pack "\\t"
