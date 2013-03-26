@@ -1,8 +1,8 @@
 # Convert SQL Server dump scripts into PostgreSQL
 
-This script was developed for the RAVF project.
+This script was developed to solve the simple problem of getting data from SQL Server to PostgreSQL. It is very simple, and probably doesn't do what you want. But in case it does, here you are.
 
-## Building
+## Building and installing
 
 You can build the executable using cabal:
 
