@@ -15,7 +15,7 @@ That will create an executable called `dist/build/sqlconvert/sqlconvert`. It can
 The script expects an ASCI formated SQL Server dump file. UTF-8 coming next. It reads standard in and writes standard out. So, for example:
 
     user@computer:~/$ createdb mydb
-    user@computer:~/$ time cat mydb-sql-server.sql | sqlconvert | psql -d mydb -f -
+    user@computer:~/$ time cat mydb-sql-server.sql | sqlconvert 2> errors.txt | psql -d mydb -f -
 
 It is also quite a good idea to set the `--set ON_ERROR_STOP=1` flag on the psql command.
 
@@ -23,7 +23,7 @@ The database is assumed to have already been created.
 
 ## How it works
 
-It only reads certain information from the dump script: all the `CREATE TABLE` statements, the `ALTER TABLE` statements, and the insert statements.
+It only reads certain information from the dump script: all the `CREATE TABLE` statements, the `ALTER TABLE` statements, and the `INSERT` statements.
 
 The insert statements are rolled up into PostgreSQL's   `COPY` statement, which is much faster.
 
