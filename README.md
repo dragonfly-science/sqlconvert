@@ -12,7 +12,7 @@ That will create an executable called `dist/build/sqlconvert/sqlconvert`. It can
 
 ## Using it
 
-The script expects an ASCI formated SQL Server dump file. UTF-8 coming next. It reads standard in and writes standard out. So, for example:
+The script expects an ASCII formatted SQL Server dump file. UTF-8 coming next. It reads standard in and writes standard out. So, for example:
 
     user@computer:~/$ createdb mydb
     user@computer:~/$ time cat mydb-sql-server.sql | sqlconvert 2> errors.txt | psql -d mydb -f -
