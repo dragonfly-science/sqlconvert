@@ -8,7 +8,7 @@ You can build the executable using cabal:
 
     user@computer:~/$ cabal install
 
-That will create an executable called `dist/build/sqlconvert/sqlconvert`. It can be copied to another ubuntu machine, for example to `/usr/local/bin/sqlconvert`
+That will create an executable called `dist/build/sqlconvert/sqlconvert`. It can be copied to another machine, for example to `/usr/local/bin/sqlconvert`
 
 Note: I have checked in the executable in the base directory too, if you don't have the Haskell platform near by.
 
