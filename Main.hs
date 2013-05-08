@@ -75,12 +75,11 @@ insertStatement insertState =
     where
         writeVals :: [BS.ByteString] -> ByteString
         writeVals vals = concat [intercalate "\t" $ map fromStrict vals, "\n"]
-        numbers = AL.takeWhile $ AL.inClass "0-9.xA-F"
         value  =  (string "NULL" >> return "\\N")
               <|> parseString
               <|> parseCast
               <|> parseDateTime
-              <|> numbers
+              <|> parseNumber
 
 
 ignoreInsert :: Parser Entry
@@ -125,9 +124,14 @@ parseString =
 parseCast :: Parser BS.ByteString
 parseCast =
   do 
-    string "CAST(" *> number <* " AS Decimal(" <* number <* ", " <* number <* "))"   
-    where
-        number = AL.takeWhile $ AL.inClass "0-9.xA-F"
+    string "CAST(" *> parseNumber <* " AS Decimal(" <* parseNumber <* ", " <* parseNumber <* "))"   
+
+parseNumber :: Parser BS.ByteString
+parseNumber = 
+  do
+    sign <- option "" (string "-")
+    nums <- AL.takeWhile $ AL.inClass "0-9.xA-F"
+    return $ BSC.concat [sign , nums]
 
 finishInserts :: InsertState -> Parser (InsertState, Entry)
 finishInserts Nothing = mzero
