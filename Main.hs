@@ -197,6 +197,7 @@ showColumn (Column cn ct cqs) =
         pgType "datetime"   = "TIMESTAMP"
         pgType "char"       = "CHAR"
         pgType "varchar"    = "VARCHAR"
+        pgType "nvarchar"   = "VARCHAR"
         pgType "int"        = "INT"
         pgType "bigint"     = "BIGINT"
         pgType "boolean"    = "BOOLEAN"
