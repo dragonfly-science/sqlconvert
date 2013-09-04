@@ -1,34 +1,37 @@
 {-# LANGUAGE OverloadedStrings #-}
-{-# LANGUAGE TupleSections #-}
+{-# LANGUAGE TupleSections     #-}
 --
 module Main where
 -- SQL Server ouput converted into PostgreSQL
 
-import           Control.Applicative hiding (many)
-import           Control.Monad (mzero)
-import           Numeric (readHex)
+import           Control.Applicative              hiding (many)
+import           Control.Monad                    (mzero)
 import           Data.Time
+import           Numeric                          (readHex)
 import           System.Locale
 
-import           Data.Attoparsec.ByteString as A hiding (takeWhile1)
-import           Data.Attoparsec.ByteString.Char8 as AC 
-        (endOfLine, isEndOfLine, skipSpace, char, takeWhile1, satisfy, inClass)
-import qualified Data.Attoparsec.ByteString.Lazy as AL
+import           Data.Attoparsec.ByteString       as A hiding (takeWhile1)
+import           Data.Attoparsec.ByteString.Char8 as AC (char, endOfLine,
+                                                         inClass, isEndOfLine,
+                                                         satisfy, skipSpace,
+                                                         takeWhile1)
+import qualified Data.Attoparsec.ByteString.Lazy  as AL
 
-import qualified Data.ByteString as BS
-import qualified Data.ByteString.Char8 as BSC
-import           Data.ByteString.Lazy hiding (map)
+import qualified Data.ByteString                  as BS
+import qualified Data.ByteString.Char8            as BSC
+import           Data.ByteString.Lazy             hiding (map)
 
-import           Prelude hiding (takeWhile, concat, interact, getContents, putStr)
-import           System.IO (stderr)
+import           Prelude                          hiding (concat, getContents,
+                                                   interact, putStr, takeWhile)
+import           System.IO                        (stderr)
 
 -- Entry captures something interesting, or Nothing
 type Entry = Either (Maybe ByteString) ByteString
 -- the names of 'current' insert fields
-type InsertState = Maybe [ BS.ByteString ] 
+type InsertState = Maybe [ BS.ByteString ]
 
 main :: IO ()
-main = 
+main =
   do
     contents <- getContents
     let parsed = parseSQL Nothing contents
@@ -37,7 +40,7 @@ main =
         writeErrors (Just err) = hPutStr stderr err
         writeErrors Nothing    = return ()
 
--- Lazy parser, converts a lazy bytestring into a lazy string of Entries 
+-- Lazy parser, converts a lazy bytestring into a lazy string of Entries
 parseSQL :: InsertState -> ByteString -> [Entry]
 parseSQL insertState contents =
   case AL.parse (parseEntry insertState) contents of
@@ -48,8 +51,8 @@ parseSQL insertState contents =
 parseEntry :: InsertState -> Parser (InsertState, Entry)
 parseEntry insertState  =  (insertState,) <$> createTable
                        <|> (insertState,) <$> alterTable
-                       <|> insertStatement insertState 
-                       <|> finishInserts insertState 
+                       <|> insertStatement insertState
+                       <|> finishInserts insertState
                        <|> (insertState,) <$> ignoreInsert
                        <|> (insertState,) <$> ignoreLine
 
@@ -61,7 +64,7 @@ parseEntry insertState  =  (insertState,) <$> createTable
 -- First one sets up some state
 -- After that it gets checked...
 insertStatement :: InsertState -> Parser (InsertState, Entry)
-insertStatement insertState = 
+insertStatement insertState =
   do
     tableName <- string "INSERT [dbo]." *> identifier <* char ' '
     columns <- char '(' *> identifier `sepBy` (string ", ") <* char ')'
@@ -83,17 +86,17 @@ insertStatement insertState =
 
 
 ignoreInsert :: Parser Entry
-ignoreInsert = 
-  do 
+ignoreInsert =
+  do
     start <- string "INSERT [dbo]."
     rest <- AL.takeWhile (not . isEndOfLine)
     endOfLine
     return $ Left (Just ( concat [fromStrict start, fromStrict rest, "\n"]))
 
-parseDateTime :: Parser BS.ByteString 
+parseDateTime :: Parser BS.ByteString
 parseDateTime =
-  do 
-    (hex1, hex2) <- string "CAST(0x" *> ((,) <$> eighthex <*> eighthex) <* " AS DateTime)"   
+  do
+    (hex1, hex2) <- string "CAST(0x" *> ((,) <$> eighthex <*> eighthex) <* " AS DateTime)"
     let [(days, _)] = readHex hex1
         timen :: Double
         [(timen, _)] = readHex hex2
@@ -101,16 +104,16 @@ parseDateTime =
         timeDiff = picosecondsToDiffTime (floor (timen * 10000000000/3))
     if days > 106680740  -- largest date 294276 AD
         then return "294275-01-01 00:00:00"
-        else return $ BSC.pack $ formatTime defaultTimeLocale "%F %T" $ UTCTime day timeDiff 
+        else return $ BSC.pack $ formatTime defaultTimeLocale "%F %T" $ UTCTime day timeDiff
     where
         eighthex = A.count 8 (AC.satisfy (AC.inClass "0-9A-F"))
-            
+
 parseString :: Parser BS.ByteString
-parseString = 
+parseString =
   do
     res <- string "N'" *> contents <* char '\''
     return $ BSC.concatMap escape res
-    where   
+    where
         contents = BSC.concat <$> many' (takeWhile1 (/= '\'') <|> (string "''" >> return "'"))
         -- http://www.postgresql.org/docs/9.1/static/sql-copy.html
         escape '\n' = BSC.pack "\\n"
@@ -123,11 +126,11 @@ parseString =
 
 parseCast :: Parser BS.ByteString
 parseCast =
-  do 
-    string "CAST(" *> parseNumber <* " AS Decimal(" <* parseNumber <* ", " <* parseNumber <* "))"   
+  do
+    string "CAST(" *> parseNumber <* " AS Decimal(" <* parseNumber <* ", " <* parseNumber <* "))"
 
 parseNumber :: Parser BS.ByteString
-parseNumber = 
+parseNumber =
   do
     sign <- option "" (string "-")
     nums <- AL.takeWhile $ AL.inClass "0-9.xA-F"
@@ -138,9 +141,9 @@ finishInserts Nothing = mzero
 finishInserts (Just _) = (string "/****" <|> string "SET") >> ignoreLine >> return (Nothing, Right "\\.\n")
 
 -----------------------------------
--- CREATE TABLE 
+-- CREATE TABLE
 createTable :: Parser Entry
-createTable = 
+createTable =
   do
     tableName <- string "CREATE TABLE [dbo]." *> identifier <* string "(" <* endOfLine
     columns <- many1 (column <* ignoreLine)
@@ -148,7 +151,7 @@ createTable =
     let result = concat $ ["CREATE TABLE ", showIdentifier tableName, " (", "\n",  cs, "\n);\n"]
     return (Right result)
 
--- ALTER TABLE 
+-- ALTER TABLE
 alterTable :: Parser Entry
 alterTable =
   do
@@ -165,8 +168,8 @@ showIdentifier :: BS.ByteString -> ByteString
 showIdentifier ident = concat ["\"", fromStrict ident, "\""]
 
 cqualifier :: Parser BS.ByteString
-cqualifier  =  string "NOT NULL" 
-           <|> string "NULL" 
+cqualifier  =  string "NOT NULL"
+           <|> string "NULL"
            <|> (string "IDENTITY(1,1)" >> return "PRIMARY KEY")
 
 
@@ -174,7 +177,7 @@ cqualifier  =  string "NOT NULL"
 data ColumnType = ColumnType BS.ByteString (Maybe BS.ByteString) deriving Eq
 ctype :: Parser ColumnType
 ctype = ColumnType <$> identifier <*> option Nothing nums
-    where 
+    where
         nums = Just <$> (char '(' *> takeWhile1 (/= ')') <* char ')')
 
 data Column = Column { columnName :: BS.ByteString, columnType :: ColumnType, columnQualifiers :: [BS.ByteString] } deriving Eq
